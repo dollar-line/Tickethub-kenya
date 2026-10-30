@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketHub Kenya | Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f5f8;color:#172033}
+header{background:#101b35;color:#fff;padding:20px;text-align:center}header h1{margin:0;color:#f5b82e}
+main{max-width:1100px;margin:24px auto;padding:0 14px}.card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 4px 18px #00000012;margin-bottom:18px}
+input{width:100%;padding:12px;border:1px solid #ccd2dc;border-radius:7px;margin:8px 0 14px;font-size:16px}
+button{padding:11px 15px;border:0;border-radius:7px;background:#e9a900;color:#172033;font-weight:bold;cursor:pointer;margin:4px}
+button.secondary{background:#e5e9f0}button:disabled{opacity:.6}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}.stat{background:#edf2fa;padding:16px;border-radius:9px}.stat strong{display:block;font-size:25px;margin-top:6px}
+.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:850px}th,td{text-align:left;padding:12px;border-bottom:1px solid #e5e9f0;font-size:14px}th{background:#f7f8fa}
+.status{font-weight:bold;text-transform:capitalize}.pending{color:#a66b00}.confirmed{color:#16834a}.cancelled{color:#b42318}
+#notice{margin-top:12px;overflow-wrap:anywhere}.hidden{display:none}
+</style>
+</head>
+<body>
+<header><h1>TicketHub Kenya</h1><p>Admin dashboard</p></header>
+<main>
+<section class="card" id="loginCard">
+<h2>Administrator sign in</h2>
+<p>Sign in using the admin account created in Supabase Authentication.</p>
+<form id="loginForm">
+<label>Email address</label><input id="email" type="email" autocomplete="username" required>
+<label>Password</label><input id="password" type="password" autocomplete="current-password" required>
+<button id="loginButton" type="submit">Sign in</button>
+</form><p id="loginNotice" role="status"></p>
+</section>
+<section id="dashboard" class="hidden">
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+<h2>Booking requests</h2><div><button class="secondary" id="refreshButton">Refresh</button><button class="secondary" id="logoutButton">Sign out</button></div>
+</div>
+<div class="stats">
+<div class="stat">Total requests<strong id="totalCount">0</strong></div>
+<div class="stat">Pending<strong id="pendingCount">0</strong></div>
+<div class="stat">Confirmed<strong id="confirmedCount">0</strong></div>
+<div class="stat">Cancelled<strong id="cancelledCount">0</strong></div>
+</div>
+<p id="notice" role="status"></p>
+</div>
+<div class="card">
+<div class="table-wrap"><table>
+<thead><tr><th>Reference</th><th>Customer</th><th>Contact</th><th>Ticket</th><th>Qty</th><th>Total</th><th>Date</th><th>Status / action</th></tr></thead>
+<tbody id="bookingRows"><tr><td colspan="8">Sign in to load bookings.</td></tr></tbody>
+</table></div>
+</div>
+</section>
+</main>
+<script>
+const SUPABASE_URL = "https://vzanwhycbjfemkfsgbyo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_tDIrP7-GV0LS2x94Bbdt1w_odJMbpyM";
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const loginCard=document.getElementById("loginCard");
+const dashboard=document.getElementById("dashboard");
+const loginNotice=document.getElementById("loginNotice");
+const notice=document.getElementById("notice");
+const rows=document.getElementById("bookingRows");
+const money=n=>"KES "+Number(n||0).toLocaleString("en-KE");
+function showDashboard(show){loginCard.classList.toggle("hidden",show);dashboard.classList.toggle("hidden",!show)}
+async function loadBookings(){
+ notice.textContent="Loading booking requests...";
+ const {data,error}=await db.from("bookings").select("*").order("created_at",{ascending:false});
+ if(error){notice.textContent="Could not load bookings: "+error.message;return}
+ const list=data||[];
+ document.getElementById("totalCount").textContent=list.length;
+ document.getElementById("pendingCount").textContent=list.filter(x=>x.status==="pending").length;
+ document.getElementById("confirmedCount").textContent=list.filter(x=>x.status==="confirmed").length;
+ document.getElementById("cancelledCount").textContent=list.filter(x=>x.status==="cancelled").length;
+ rows.innerHTML="";
+ if(!list.length){rows.innerHTML='<tr><td colspan="8">No booking requests yet.</td></tr>'}
+ list.forEach(b=>{
+  const tr=document.createElement("tr");
+  const cells=[b.booking_reference||("Booking #"+b.id),b.full_name,b.email+" / "+b.phone,b.ticket_type,b.quantity,money(b.total_amount),b.created_at?new Date(b.created_at).toLocaleString():""];
+  cells.forEach(value=>{const td=document.createElement("td");td.textContent=value??"";tr.appendChild(td)});
+  const action=document.createElement("td");
+  const status=document.createElement("span");status.className="status "+(b.status||"pending");status.textContent=b.status||"pending";action.appendChild(status);
+  const select=document.createElement("select");select.style.marginLeft="8px";select.style.padding="7px";
+  ["pending","confirmed","cancelled"].forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;o.selected=(b.status||"pending")===s;select.appendChild(o)});
+  select.addEventListener("change",async()=>{
+   select.disabled=true;notice.textContent="Updating booking...";
+   const {error:updateError}=await db.from("bookings").update({status:select.value}).eq("id",b.id);
+   if(updateError){notice.textContent="Update failed: "+updateError.message;select.value=b.status||"pending";select.disabled=false;return}
+   notice.textContent="Booking status updated.";await loadBookings();
+  });
+  action.appendChild(select);tr.appendChild(action);rows.appendChild(tr);
+ });
+ if(list.length)notice.textContent="Showing "+list.length+" booking request(s).";
+}
+document.getElementById("loginForm").addEventListener("submit",async e=>{
+ e.preventDefault();const button=document.getElementById("loginButton");button.disabled=true;button.textContent="Signing in...";
+ const {error}=await db.auth.signInWithPassword({email:document.getElementById("email").value.trim(),password:document.getElementById("password").value});
+ if(error){loginNotice.textContent="Sign in failed: "+error.message}
+ else{loginNotice.textContent="";showDashboard(true);await loadBookings()}
+ button.disabled=false;button.textContent="Sign in";
+});
+document.getElementById("refreshButton").addEventListener("click",loadBookings);
+document.getElementById("logoutButton").addEventListener("click",async()=>{await db.auth.signOut();showDashboard(false)});
+db.auth.getSession().then(async({data})=>{if(data.session){showDashboard(true);await loadBookings()}});
+</script>
+</body>
+</html>
