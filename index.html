@@ -271,18 +271,14 @@ form.addEventListener("submit", async function(e) {
 
     const { data, error } = await db
       .from("bookings")
-      .insert([booking])
-      .select("booking_reference")
-      .single();
+      .insert([booking]);
 
     if (error) throw error;
 
     message.style.color = "green";
 
     message.textContent =
-      "Booking submitted successfully! Your reference is: " +
-      data.booking_reference +
-      ". We will contact you soon.";
+      "Booking request submitted successfully! We will contact you soon.";
 
     form.reset();
     calculateTotal();
