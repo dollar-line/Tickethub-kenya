@@ -1,0 +1,310 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TicketHub Kenya | Book Tickets</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f5f8;
+  color: #172033;
+}
+
+header {
+  background: #101b35;
+  color: white;
+  padding: 22px 15px;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+  color: #f5b82e;
+  font-size: 28px;
+}
+
+.hero {
+  background: linear-gradient(135deg, #14274c, #263e70);
+  color: white;
+  text-align: center;
+  padding: 55px 15px;
+}
+
+.hero h2 {
+  font-size: 30px;
+  margin: 0 0 15px;
+}
+
+.container {
+  max-width: 600px;
+  margin: 25px auto;
+  padding: 0 15px;
+}
+
+.card {
+  background: white;
+  padding: 24px;
+  border-radius: 14px;
+  box-shadow: 0 4px 18px #00000012;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+  margin: 16px 0 7px;
+}
+
+input, select {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #ccd2dc;
+  border-radius: 7px;
+  font-size: 16px;
+}
+
+.total {
+  margin-top: 20px;
+  padding: 15px;
+  background: #edf2fa;
+  border-radius: 8px;
+  font-size: 19px;
+  font-weight: bold;
+  text-align: center;
+}
+
+button {
+  width: 100%;
+  padding: 15px;
+  border: 0;
+  border-radius: 7px;
+  background: #e9a900;
+  color: #172033;
+  font-size: 17px;
+  font-weight: bold;
+  margin-top: 22px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+}
+
+#message {
+  margin-top: 18px;
+  font-weight: bold;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #687080;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>TicketHub Kenya</h1>
+  <p>Your trusted event ticket booking platform</p>
+</header>
+
+<section class="hero">
+  <h2>FC Bayern Munich vs Ajax Amsterdam</h2>
+  <p>5 January 2027</p>
+  <p>Raila Odinga International Stadium, Nairobi</p>
+</section>
+
+<div class="container">
+<div class="card">
+
+<h2>Book Your Tickets</h2>
+
+<p>Choose your preferred ticket category and submit your booking request.</p>
+
+<form id="bookingForm">
+
+<label>Full name</label>
+<input
+  id="fullName"
+  type="text"
+  required
+  placeholder="Enter your full name"
+>
+
+<label>Email address</label>
+<input
+  id="email"
+  type="email"
+  required
+  placeholder="Enter your email"
+>
+
+<label>Phone number</label>
+<input
+  id="phone"
+  type="tel"
+  required
+  placeholder="e.g. 0712345678"
+>
+
+<label>Ticket category</label>
+<select id="ticketType" required>
+  <option value="">Choose category</option>
+  <option value="STANDARD">STANDARD - KES 1,500</option>
+  <option value="PREMIUM">PREMIUM - KES 4,000</option>
+  <option value="VIP EXPERIENCE">VIP EXPERIENCE - KES 8,000</option>
+</select>
+
+<label>Number of tickets</label>
+<input
+  id="quantity"
+  type="number"
+  min="1"
+  max="10"
+  value="1"
+  required
+>
+
+<div class="total">
+  Total: KES <span id="totalPrice">0</span>
+</div>
+
+<button id="submitButton" type="submit">
+  Submit Booking Request
+</button>
+
+</form>
+
+<div id="message" role="status"></div>
+
+</div>
+</div>
+
+<footer>
+  © 2026 TicketHub Kenya. All rights reserved.
+</footer>
+
+<script>
+
+// SUPABASE CONNECTION
+const SUPABASE_URL =
+"https://vzanwhycbjfemkfsgbyo.supabase.co";
+
+const SUPABASE_KEY =
+"sb_publishable_tDIrP7-GV0LS2x94Bbdt1w_odJMbpyM";
+
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+// TICKET PRICES
+const prices = {
+  "STANDARD": 1500,
+  "PREMIUM": 4000,
+  "VIP EXPERIENCE": 8000
+};
+
+const form = document.getElementById("bookingForm");
+const ticketType = document.getElementById("ticketType");
+const quantity = document.getElementById("quantity");
+const totalPrice = document.getElementById("totalPrice");
+const message = document.getElementById("message");
+const button = document.getElementById("submitButton");
+
+// CALCULATE TOTAL
+function calculateTotal() {
+  const price = prices[ticketType.value] || 0;
+  const qty = Number(quantity.value) || 0;
+
+  totalPrice.textContent =
+    (price * qty).toLocaleString("en-KE");
+}
+
+ticketType.addEventListener("change", calculateTotal);
+quantity.addEventListener("input", calculateTotal);
+
+// SUBMIT BOOKING
+form.addEventListener("submit", async function(e) {
+
+  e.preventDefault();
+
+  const selectedType = ticketType.value;
+  const qty = Number(quantity.value);
+  const price = prices[selectedType];
+
+  if (!price || !Number.isInteger(qty) || qty < 1 || qty > 10) {
+    message.style.color = "red";
+    message.textContent = "Please select a valid ticket and quantity.";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Submitting...";
+  message.textContent = "";
+
+  const booking = {
+    full_name: document.getElementById("fullName").value.trim(),
+    email: document.getElementById("email").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+    event_name: "FC Bayern Munich vs Ajax Amsterdam",
+    ticket_type: selectedType,
+    quantity: qty,
+    unit_price: price,
+    total_amount: price * qty
+  };
+
+  try {
+
+    const { data, error } = await db
+      .from("bookings")
+      .insert([booking])
+      .select("booking_reference")
+      .single();
+
+    if (error) throw error;
+
+    message.style.color = "green";
+
+    message.textContent =
+      "Booking submitted successfully! Your reference is: " +
+      data.booking_reference +
+      ". We will contact you soon.";
+
+    form.reset();
+    calculateTotal();
+
+  } catch (error) {
+
+    console.error("Booking error:", error);
+
+    message.style.color = "red";
+    message.textContent =
+      "Booking could not be submitted. Please try again.";
+
+  } finally {
+
+    button.disabled = false;
+    button.textContent = "Submit Booking Request";
+
+  }
+
+});
+
+</script>
+
+</body>
+</html>
